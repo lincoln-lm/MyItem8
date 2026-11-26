@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MyItem8 Editor</title>
+</head>
+
+<body>
+    <input id="file" type="file">
+    <button onclick="serialize()">Save</button>
+    <div id="editor"></div>
+    <datalist id="items"></datalist>
+
+    <script>
+        let itemsArray = []
+        fetch("https://raw.githubusercontent.com/kwsch/PKHeX/a5311f9f55a84376fd2e2499b25d9fb9640d9f2d/PKHeX.Core/Resources/text/items/text_Items_en.txt")
+            .then(response => response.text())
+            .then(text => {
+                itemsArray = text.split("\n");
+                const options = itemsArray.map(line => {
+                    const option = document.createElement("option");
+                    option.setAttribute("value", line);
+                    return option;
+                });
+                document.getElementById("items").replaceChildren(...options);
+            });
+        const pouches = {
+            Medicine: 60,
+            Balls: 30,
+            BattleItems: 20,
+            Berries: 80,
+            Items: 550,
+            Machines: 210,
+            Treasure: 100,
+            Candy: 100,
+            KeyItems: 64,
+        };
+        const parsed = [];
+        const parse = (items) => {
+            parsed.length = 0;
+            let index = 0;
+            for (const pouch in pouches) {
+                const parsedPouch = [];
+                const size = pouches[pouch];
+                for (let ofs = 0; ofs < size; index++, ofs++) {
+                    const item = items[index];
+
+                    parsedPouch.push(
+                        {
+                            index: item & 0x7FFF,
+                            count: (item >> 15) & 0x7FFF,
+                            isNew: (item & 0x40000000) != 0,
+                            isFavorite: (item & 0x80000000) != 0,
+                        }
+                    );
+                }
+                parsed.push(parsedPouch);
+            }
+        };
+        const serialize = () => {
+            const total = parsed.reduce((sum, pouch) => sum + pouch.length, 0);
+            if (parsed.length != Object.keys(pouches).length || total != 1214) {
+                alert(`invalid parsed items ${parsed.length} ${total}`);
+            }
+            const items = new Uint32Array(1214);
+            let index = 0;
+            for (const pouch in parsed) {
+                const size = pouches[Object.keys(pouches)[pouch]];
+                for (let ofs = 0; ofs < size; index++, ofs++) {
+                    const item = parsed[pouch][ofs];
+                    items[index] = (item.index & 0x7FFF) | ((item.count & 0x7FFF) << 15) | ((item.isNew ? 1 : 0) << 30) | ((item.isFavorite ? 1 : 0) << 31)
+                }
+            }
+            const blob = new Blob([items], { type: "application/octet-stream" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "items_save_block.bin";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        document.getElementById('file').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            const editor = document.getElementById('editor');
+
+            if (!file) {
+                return;
+            }
+
+            const items = new Uint32Array(await file.arrayBuffer());
+            console.log(items);
+            editor.setHTMLUnsafe("")
+            parse(items);
+            for (const pouch in parsed) {
+                const parsedPouch = parsed[pouch];
+                editor.appendChild(document.createTextNode(Object.keys(pouches)[pouch] + ":"))
+                for (let pouchOfs = 0; pouchOfs < parsedPouch.length; pouchOfs++) {
+                    const item = parsedPouch[pouchOfs];
+                    const row = document.createElement("div");
+                    const indexSelect = document.createElement("input");
+                    const indexDisplay = document.createTextNode("0");
+                    const countInput = document.createElement("input");
+                    countInput.type = "number";
+                    indexSelect.setAttribute("list", "items");
+                    indexSelect.addEventListener("input", (event) => {
+                        const name = event.target.value;
+                        const index = itemsArray.findIndex(item => item === name);
+                        parsed[pouch][pouchOfs].index = index;
+                        indexDisplay.textContent = index;
+                    });
+                    indexSelect.value = itemsArray[item.index];
+                    indexSelect.dispatchEvent(new Event("input", { bubbles: true }));
+                    countInput.addEventListener("input", (event) => {
+                        const count = parseInt(event.target.value);
+                        parsed[pouch][pouchOfs].count = count;
+                    });
+                    countInput.value = parsed[pouch][pouchOfs].count;
+
+                    row.replaceChildren(indexSelect, indexDisplay, countInput);
+                    editor.appendChild(
+                        row
+                    )
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
