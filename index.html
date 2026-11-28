@@ -18,7 +18,7 @@
         fetch("https://raw.githubusercontent.com/kwsch/PKHeX/a5311f9f55a84376fd2e2499b25d9fb9640d9f2d/PKHeX.Core/Resources/text/items/text_Items_en.txt")
             .then(response => response.text())
             .then(text => {
-                itemsArray = text.split("\n");
+                itemsArray = text.split("\n").map((line, index) => `${line} (${index})`);
                 const options = itemsArray.map(line => {
                     const option = document.createElement("option");
                     option.setAttribute("value", line);
@@ -102,7 +102,6 @@
                     const item = parsedPouch[pouchOfs];
                     const row = document.createElement("div");
                     const indexSelect = document.createElement("input");
-                    const indexDisplay = document.createTextNode("0");
                     const countInput = document.createElement("input");
                     countInput.type = "number";
                     indexSelect.setAttribute("list", "items");
@@ -110,7 +109,6 @@
                         const name = event.target.value;
                         const index = itemsArray.findIndex(item => item === name);
                         parsed[pouch][pouchOfs].index = index;
-                        indexDisplay.textContent = index;
                     });
                     indexSelect.value = itemsArray[item.index];
                     indexSelect.dispatchEvent(new Event("input", { bubbles: true }));
@@ -120,7 +118,7 @@
                     });
                     countInput.value = parsed[pouch][pouchOfs].count;
 
-                    row.replaceChildren(indexSelect, indexDisplay, countInput);
+                    row.replaceChildren(indexSelect, countInput);
                     editor.appendChild(
                         row
                     )
